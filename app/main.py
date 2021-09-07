@@ -69,22 +69,24 @@ async def query(category:int,publisher:int,zip_code:int,maximum:int=None):
 
         logger.error(ranking_response.json())
 
-        # ads_params = {"advertiser_campaigns":valid_advertiser_campaigns}
-        # ads_response = requests.get(ads_endpoint,params=ads_params)
+        ads_params = {"advertiser_campaigns":valid_advertiser_campaigns}
+        ads_response = requests.get(ads_endpoint,params=ads_params)
 
-        # pricing_params = {"advertiser_campaigns":valid_advertiser_campaigns, "advertiser_campaigns_bids":campaing_bids,"publisher":publisher}
-        # pricing_response = requests.get(pricing_endpoint,params=pricing_params)
+        logger.error(ads_response.json())
 
-        # ads_aray = []
-        # for ad in ads_response.json():
-        #     ads_aray.append({
-        #         "headline": ad["headline"],
-        #         "description": ad["description"],
-        #         "url":ad["url"]
-        #     })
+        pricing_params = {"advertiser_campaigns":valid_advertiser_campaigns, "advertiser_campaigns_bids":campaing_bids,"publisher":publisher}
+        pricing_response = requests.get(pricing_endpoint,params=pricing_params)
+        logger.error(pricing_response.json())
 
-        # return {'ads':ads_aray}
-        return
+        ads_aray = []
+        for ad in ads_response.json():
+            ads_aray.append({
+                "headline": ad["headline"],
+                "description": ad["description"],
+                "url":ad["url"]
+            })
+
+        return {'ads':ads_aray}
     # except: 
     #     raise HTTPException(status_code=404, detail= f'No se encontraron anuncios {category}') 
  
