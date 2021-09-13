@@ -12,13 +12,13 @@ gunicorn_logger = logging.getLogger('gunicorn.error')
 logger.handlers = gunicorn_logger.handlers
 logger.setLevel(gunicorn_logger.level)
 
-query_endpoint = 'http://18.222.133.9:80/query'
-matching_endpoint = 'http://18.222.133.9:81/matching'
-exclusion_endpoint = 'http://18.222.133.9:82/exclusion'
-targeting_endpoint = 'http://18.222.133.9:83/targeting'
-ranking_endpoint = 'http://18.222.133.9:84/ranking'
-ads_endpoint = 'http://18.222.133.9:85/ads'
-pricing_endpoint = 'http://18.222.133.9:86/pricing'
+query_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/query'
+matching_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/matching'
+exclusion_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/exclusion'
+targeting_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/targeting'
+ranking_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/ranking'
+ads_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/ads'
+pricing_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/pricing'
 
 if __name__ != "main":
     logger.setLevel(gunicorn_logger.level)
