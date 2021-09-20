@@ -12,13 +12,13 @@ gunicorn_logger = logging.getLogger('gunicorn.error')
 logger.handlers = gunicorn_logger.handlers
 logger.setLevel(gunicorn_logger.level)
 
-query_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/query'
-matching_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/matching'
-exclusion_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/exclusion'
-targeting_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/targeting'
-ranking_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/ranking'
-ads_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/ads'
-pricing_endpoint = 'internal-private-1816648545.us-east-2.elb.amazonaws.com/pricing'
+query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/query'
+matching_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/matching'
+exclusion_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/exclusion'
+targeting_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/targeting'
+ranking_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ranking'
+ads_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ads'
+pricing_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/pricing'
 
 if __name__ != "main":
     logger.setLevel(gunicorn_logger.level)
@@ -33,7 +33,6 @@ def read_root():
 
 @app.get("/query")
 async def query(category:int,publisher:int,zip_code:int,maximum:int=None):
-    # try:
         matching_params = {"category":category}
         matching_response = requests.get(matching_endpoint,params=matching_params)
         matching_response.raise_for_status()
@@ -87,9 +86,6 @@ async def query(category:int,publisher:int,zip_code:int,maximum:int=None):
             })
 
         return {'ads':ads_aray}
-    # except: 
-    #     raise HTTPException(status_code=404, detail= f'No se encontraron anuncios {category}') 
- 
 
 
      
