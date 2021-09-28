@@ -1,4 +1,4 @@
-from typing import Optional,List
+from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.logger import logger
@@ -6,6 +6,8 @@ from fastapi.param_functions import Query
 
 import logging 
 import requests 
+import boto3
+import os
 
 app = FastAPI(title='Query Service',version='0.1')
 gunicorn_logger = logging.getLogger('gunicorn.error')
@@ -26,9 +28,27 @@ else:
     logger.setLevel(logging.DEBUG)
 
 
+def get_table():
+    ACCESS_KEY = os.environ.get('ACCESS_KEY')
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    SESSION_TOKEN = os.environ.get('SESSION_TOKEN')
+
+    dynamodb_client = boto3.client(
+        'dynamodb',
+        aws_access_key_id=ACCESS_KEY,
+        aws_secret_access_key=SECRET_KEY,
+        aws_session_token=SESSION_TOKEN
+    )
+
+    table = dynamodb_client.Table('sessions')
+    print(table.creation_date_time)
+    return table
+
+
 @app.get("/")
 def read_root():
-    return {"Service": "Query"}
+    table = get_table()
+    return {"Service": "Query", "table.creation_date_time" : table.creation_date_time}
 
 
 @app.get("/query")
