@@ -8,6 +8,8 @@ import logging
 import requests 
 import boto3
 import os
+import uuid
+import datetime
 
 app = FastAPI(title='Query Service',version='0.1')
 gunicorn_logger = logging.getLogger('gunicorn.error')
@@ -21,6 +23,8 @@ targeting_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws
 ranking_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ranking'
 ads_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ads'
 pricing_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/pricing'
+click_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/click'
+
 
 if __name__ != "main":
     logger.setLevel(gunicorn_logger.level)
@@ -28,27 +32,33 @@ else:
     logger.setLevel(logging.DEBUG)
 
 
-def get_table():
-    ACCESS_KEY = os.environ.get('ACCESS_KEY')
-    SECRET_KEY = os.environ.get('SECRET_KEY')
-    SESSION_TOKEN = os.environ.get('SESSION_TOKEN')
+def put_items(items):
+    # ACCESS_KEY = os.environ.get('ACCESS_KEY')
+    # SECRET_KEY = os.environ.get('SECRET_KEY')
+    # SESSION_TOKEN = os.environ.get('SESSION_TOKEN')
 
-    dynamodb_client = boto3.client(
-        'dynamodb',
-        aws_access_key_id=ACCESS_KEY,
-        aws_secret_access_key=SECRET_KEY,
-        aws_session_token=SESSION_TOKEN
-    )
+    # dynamodb_client = boto3.client(
+    #     'dynamodb',
+    #     aws_access_key_id=ACCESS_KEY,
+    #     aws_secret_access_key=SECRET_KEY,
+    #     aws_session_token=SESSION_TOKEN
+    # )
 
-    table = dynamodb_client.Table('sessions')
-    print(table.creation_date_time)
+    dynamodb = boto3.resource('dynamodb',region_name='us-east-2')
+    table = dynamodb.Table('sessions')
+
+    with table.batch_writer() as batch:
+        for item in items:
+            batch.put_item(
+                Item = item
+            )
     return table
 
 
 @app.get("/")
 def read_root():
-    table = get_table()
-    return {"Service": "Query", "table.creation_date_time" : table.creation_date_time}
+    table = put_items([])
+    return {"Service": "Query", "table.creation_date_time" : table.creation_date_time,'tomorrow':datetime.datetime.now().timestamp() + (24*60*60)}
 
 
 @app.get("/query")
@@ -97,15 +107,37 @@ async def query(category:int,publisher:int,zip_code:int,maximum:int=None):
         pricing_response = requests.get(pricing_endpoint,params=pricing_params)
         logger.error(pricing_response.json())
 
-        ads_aray = []
+        query_id = str(uuid.uuid4())
+
+        response_ads_aray = []
+        dynamo_ads_array = []
         for ad in ads_response.json():
-            ads_aray.append({
+            impression_id = str(uuid.uuid4())
+            response_ads_aray.append({
+                "impression_id": impression_id,
                 "headline": ad["headline"],
                 "description": ad["description"],
-                "url":ad["url"]
+                "click_url":f'{click_endpoint}?query_id={query_id}&impression_id={impression_id}'
             })
 
-        return {'ads':ads_aray}
+            dynamo_ads_array.append({
+                "query_id":query_id,
+                "impression_id": impression_id,
+                "advertiser_url": ad["url"],
+                "expdate": int(datetime.datetime.now().timestamp() + (24*60*60))#hours,minutes,seconds
+            })
+        
+        dynamo_response = put_items(dynamo_ads_array)
+
+        response = {
+            'headers':{
+                'query_id':query_id
+                }
+            ,
+            'ads':response_ads_aray
+        }
+
+        return response
 
 
      
