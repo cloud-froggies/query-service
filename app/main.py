@@ -31,7 +31,6 @@ pricing_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.c
 click_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/click'
 tracking_query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
 tracking_impression_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
-now_timestamp = datetime.datetime.now().timestamp()
 
 if __name__ != "main":
     logger.setLevel(gunicorn_logger.level)
@@ -69,6 +68,8 @@ def read_root():
 
 @app.get("/query")
 async def query(category: int, publisher: int, zip_code: int, maximum: int = None):
+    now_timestamp = datetime.datetime.now().isoformat()
+
     conn = get_db_conn()
     
     # matching
@@ -141,9 +142,11 @@ async def query(category: int, publisher: int, zip_code: int, maximum: int = Non
         })
 
         # using list comprehension
-        publisher_price = [campaign for campaign in pricing_response if campaign['id']==ad['campaign_id']][0]['price']
-        advertiser_price = [campaign for campaign in matching_response if campaign['id']==ad['campaign_id']][0]['bid'] - publisher_price
-        
+        # publisher_price = [campaign for campaign in pricing_response if campaign['id']==ad['campaign_id']][0]['price']
+        # advertiser_price = [campaign for campaign in matching_response if campaign['id']==ad['campaign_id']][0]['bid'] - publisher_price
+        publisher_price = 0.0
+        advertiser_price = 0.0
+
         # using db connection
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             sql_query = """SELECT advertiser_id FROM advertiser_campaigns WHERE campaign_id = %s"""
@@ -181,7 +184,7 @@ async def query(category: int, publisher: int, zip_code: int, maximum: int = Non
     # tracking (query event)
     tracking_query_params = {
         "query_id": query_id,
-        "timestamp": now_timestamp.isoformat(),
+        "timestamp": now_timestamp,
         "publisher_id": publisher, 
         "category" : category,
         "zip_code": str(zip_code)
