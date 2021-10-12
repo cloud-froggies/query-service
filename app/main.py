@@ -29,8 +29,8 @@ ranking_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.c
 ads_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ads'
 pricing_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/pricing'
 click_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/click'
-tracking_query_endpoint = ''
-tracking_impressions_endpoint = ''
+tracking_query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
+tracking_impression_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
 now_timestamp = datetime.datetime.now().timestamp()
 
 if __name__ != "main":
@@ -164,8 +164,8 @@ async def query(category: int, publisher: int, zip_code: int, maximum: int = Non
             "publisher_price": publisher_price,
             "position": index
         }
-        tracking_impressions_response = requests.get(tracking_impressions_endpoint, params=tracking_impression_params)
-        logger.error(tracking_impressions_response.json())
+        tracking_impression_response = requests.get(tracking_impression_endpoint, params=tracking_impression_params)
+        logger.error(tracking_impression_response.json())
 
     query_response = {
         'headers': {
