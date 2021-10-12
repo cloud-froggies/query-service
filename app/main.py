@@ -153,7 +153,7 @@ async def query(category: int, publisher: int, zip_code: int, maximum: int = Non
         tracking_impression_params = {
             "query_id": query_id,
             "impression_id": impression_id,
-            "timestamp": now_timestamp,
+            "timestamp": now_timestamp.isoformat(),
             "publisher_id": publisher,
             "advertiser_id" : advertiser_id,
             "advertiser_campaign_id": ad['campaign_id'],
@@ -181,7 +181,7 @@ async def query(category: int, publisher: int, zip_code: int, maximum: int = Non
     # tracking (query event)
     tracking_query_params = {
         "query_id": query_id,
-        "timestamp": now_timestamp,
+        "timestamp": now_timestamp.isoformat(),
         "publisher_id": publisher, 
         "category" : category,
         "zip_code": str(zip_code)
