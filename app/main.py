@@ -167,7 +167,7 @@ async def query(category: int, publisher: int, zip_code: int, maximum: int = Non
             "publisher_price": publisher_price,
             "position": index
         }
-        tracking_impression_response = requests.get(tracking_impression_endpoint, params=tracking_impression_params)
+        tracking_impression_response = requests.post(tracking_impression_endpoint, data=tracking_impression_params)
         logger.error(tracking_impression_response.json())
 
     query_response = {
@@ -189,7 +189,7 @@ async def query(category: int, publisher: int, zip_code: int, maximum: int = Non
         "category" : category,
         "zip_code": str(zip_code)
     }
-    tracking_query_response = requests.get(tracking_query_endpoint, params=tracking_query_params)
+    tracking_query_response = requests.post(tracking_query_endpoint, data=tracking_query_params)
     logger.error(tracking_query_response)
 
     return query_response
