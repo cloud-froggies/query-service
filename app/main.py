@@ -2,6 +2,7 @@ from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 from fastapi.logger import logger
 from fastapi.param_functions import Query
+import json
 
 import logging
 import requests
@@ -10,6 +11,9 @@ import os
 import uuid
 import datetime
 import pymysql
+import http.client
+
+
 
 DB_ENDPOINT = os.environ.get('db_endpoint')
 DB_ADMIN_USER = os.environ.get('db_admin_user')
@@ -29,8 +33,8 @@ ranking_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.c
 ads_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ads'
 pricing_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/pricing'
 click_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/click'
-tracking_query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
-tracking_impression_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
+tracking_query_endpoint = 'internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
+tracking_impression_endpoint = 'internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
 
 if __name__ != "main":
     logger.setLevel(gunicorn_logger.level)
@@ -63,133 +67,156 @@ def put_items(items):
 @app.get("/")
 def read_root():
     table = put_items([])
-    return {"Service": "Query", "table.creation_date_time": table.creation_date_time, 'tomorrow': now_timestamp + (24*60*60)}
+    return {"Service": "Query", "table.creation_date_time": table.creation_date_time, 'tomorrow': datetime.datetime.now().timestamp() + (24*60*60)}
 
 
 @app.get("/query")
-async def query(category: int, publisher: int, zip_code: int, maximum: int = None):
-    now_timestamp = datetime.datetime.now().isoformat()
+def query(category: int, publisher: int, zip_code: int, maximum: int = None):
+    try:
 
-    conn = get_db_conn()
-    
-    # matching
-    matching_params = {"category": category}
-    matching_response = requests.get(matching_endpoint, params=matching_params)
-    matching_response.raise_for_status()
-    logger.error(matching_response)
-    logger.error(matching_response.json())
-    campaign_ids = [campaign['id'] for campaign in matching_response.json()]
-    advertiser_campaigns = ','.join(map(str, campaign_ids))
-    logger.error(advertiser_campaigns)
+        now_timestamp = datetime.datetime.now()
 
-    # exclusion & targeting
-    exclusion_params = {"advertiser_campaigns": advertiser_campaigns, 'publisher': publisher}
-    exclusion_response = requests.get(exclusion_endpoint, exclusion_params)
-
-    targeting_params = {"advertiser_campaigns": advertiser_campaigns, "zip_code": zip_code}
-    targeting_response = requests.get(targeting_endpoint, targeting_params)
-
-    logger.error(exclusion_response.json())
-    logger.error(targeting_response.json())
-
-    valid_campaigns = list(set(exclusion_response.json()).intersection(set(targeting_response.json())))
-    valid_advertiser_campaigns = ','.join(map(str, valid_campaigns))
-    logger.error(valid_campaigns)
-    logger.error(valid_advertiser_campaigns)
-
-    campaign_bids = [campaign['bid'] for campaign in matching_response.json() if (campaign['id'] in valid_campaigns)]
-    campaign_bids = ','.join(map(str, campaign_bids))
-
-    # ranking
-    ranking_params = {"advertiser_campaigns": valid_advertiser_campaigns, "advertiser_campaigns_bids": campaign_bids}
-    if(maximum):
-        ranking_params["maximum"] = maximum
-
-    ranking_response = requests.get(ranking_endpoint, params=ranking_params)
-    logger.error(ranking_response.json())
-
-    # ads
-    ads_params = {"advertiser_campaigns": valid_advertiser_campaigns}
-    ads_response = requests.get(ads_endpoint, params=ads_params)
-    logger.error(ads_response.json())
-
-    # pricing 
-    pricing_params = {"advertiser_campaigns": valid_advertiser_campaigns, "advertiser_campaigns_bids": campaign_bids, "publisher": publisher}
-    pricing_response = requests.get(pricing_endpoint, params=pricing_params)
-    logger.error(pricing_response.json())
-
-    # query & tracking (impression events)
-    query_id = str(uuid.uuid4())
-    response_ads_aray = []
-    dynamo_ads_array = []
-    
-    for index in range(0, len(ads_response.json())):
-        ad = ads_response.json()[index]
-        impression_id = str(uuid.uuid4())
-        response_ads_aray.append({
-            "impression_id": impression_id,
-            "headline": ad["headline"],
-            "description": ad["description"],
-            "click_url": f'{click_endpoint}?query_id={query_id}&impression_id={impression_id}'
-        })
-
-        dynamo_ads_array.append({
-            "query_id": query_id,
-            "impression_id": impression_id,
-            "advertiser_url": ad["url"],
-            # hours * minutes * seconds
-            "expdate": int(now_timestamp + (24*60*60))
-        })
-
-        # using list comprehension
-        # publisher_price = [campaign for campaign in pricing_response if campaign['id']==ad['campaign_id']][0]['price']
-        # advertiser_price = [campaign for campaign in matching_response if campaign['id']==ad['campaign_id']][0]['bid'] - publisher_price
-        publisher_price = 0.0
-        advertiser_price = 0.0
-
-        # using db connection
-        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            sql_query = """SELECT advertiser_id FROM advertiser_campaigns WHERE campaign_id = %s"""
-            cursor.execute(sql_query,(ad['campaign_id']))
-            advertiser_id = cursor.fetchone()
+        conn = get_db_conn()
         
-        tracking_impression_params = {
-            "query_id": query_id,
-            "impression_id": impression_id,
-            "timestamp": now_timestamp.isoformat(),
-            "publisher_id": publisher,
-            "advertiser_id" : advertiser_id,
-            "advertiser_campaign_id": ad['campaign_id'],
-            "category": category,
-            "ad_id": ad['ad_id'],
-            "zip_code": str(zip_code),
-            "advertiser_price": advertiser_price,
-            "publisher_price": publisher_price,
-            "position": index
+        # matching
+        matching_params = {"category": category}
+        matching_response = requests.get(matching_endpoint, params=matching_params)
+        matching_response.raise_for_status()
+        logger.error(matching_response)
+        logger.error(matching_response.json())
+        campaign_ids = [campaign['id'] for campaign in matching_response.json()]
+        advertiser_campaigns = ','.join(map(str, campaign_ids))
+        logger.error(advertiser_campaigns)
+
+        # exclusion & targeting
+        exclusion_params = {"advertiser_campaigns": advertiser_campaigns, 'publisher': publisher}
+        exclusion_response = requests.get(exclusion_endpoint, exclusion_params)
+
+        targeting_params = {"advertiser_campaigns": advertiser_campaigns, "zip_code": zip_code}
+        targeting_response = requests.get(targeting_endpoint, targeting_params)
+
+        logger.error(exclusion_response.json())
+        logger.error(targeting_response.json())
+
+        valid_campaigns = list(set(exclusion_response.json()).intersection(set(targeting_response.json())))
+        valid_advertiser_campaigns = ','.join(map(str, valid_campaigns))
+        logger.error(valid_campaigns)
+        logger.error(valid_advertiser_campaigns)
+
+        campaign_bids = [campaign['bid'] for campaign in matching_response.json() if (campaign['id'] in valid_campaigns)]
+        campaign_bids = ','.join(map(str, campaign_bids))
+
+        # ranking
+        ranking_params = {"advertiser_campaigns": valid_advertiser_campaigns, "advertiser_campaigns_bids": campaign_bids}
+        if(maximum):
+            ranking_params["maximum"] = maximum
+
+        ranking_response = requests.get(ranking_endpoint, params=ranking_params)
+        logger.error(ranking_response.json())
+
+        # ads
+        ads_params = {"advertiser_campaigns": valid_advertiser_campaigns}
+        ads_response = requests.get(ads_endpoint, params=ads_params)
+        logger.error(ads_response.json())
+
+        # pricing 
+        pricing_params = {"advertiser_campaigns": valid_advertiser_campaigns, "advertiser_campaigns_bids": campaign_bids, "publisher": publisher}
+        pricing_response = requests.get(pricing_endpoint, params=pricing_params)
+        logger.error(pricing_response.json())
+
+        # query & tracking (impression events)
+        query_id = str(uuid.uuid4())
+        response_ads_aray = []
+        dynamo_ads_array = []
+        
+        for index in range(0, len(ads_response.json())):
+            ad = ads_response.json()[index]
+            impression_id = str(uuid.uuid4())
+            response_ads_aray.append({
+                "impression_id": impression_id,
+                "headline": ad["headline"],
+                "description": ad["description"],
+                "click_url": f'{click_endpoint}?query_id={query_id}&impression_id={impression_id}'
+            })
+
+            dynamo_ads_array.append({
+                "query_id": query_id,
+                "impression_id": impression_id,
+                "advertiser_url": ad["url"],
+                # hours * minutes * seconds
+                "expdate": int(now_timestamp.timestamp() + (24*60*60))
+            })
+
+            # using list comprehension
+            # publisher_price = [campaign for campaign in pricing_response if campaign['id']==ad['campaign_id']][0]['price']
+            # advertiser_price = [campaign for campaign in matching_response if campaign['id']==ad['campaign_id']][0]['bid'] - publisher_price
+            publisher_price = 0.0
+            advertiser_price = 0.0
+
+            # using db connection
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                sql_query = """SELECT advertiser_id FROM advertiser_campaigns WHERE id = %s"""
+                cursor.execute(sql_query,(ad['campaign_id']))
+                advertiser_id = cursor.fetchone()
+            
+            tracking_impression_params = {
+                "query_id": str(query_id),
+                "impression_id": str(impression_id),
+                "timestamp": str(now_timestamp.isoformat()),
+                "publisher_id": str(publisher),
+                "advertiser_id" : str(advertiser_id),
+                "advertiser_campaign_id": str(ad['campaign_id']),
+                "category": str(category),
+                "ad_id": str(ad['id']),
+                "zip_code": str(zip_code),
+                "advertiser_price": str(advertiser_price),
+                "publisher_price": str(publisher_price),
+                "position": str(index)
+            }
+            # tracking_impression_response = requests.post(tracking_impression_endpoint, data=json.dumps(tracking_impression_params))
+
+            conn = http.client.HTTPConnection(host=tracking_impression_endpoint)
+            headers = {'Content-type': 'application/json'}
+            json_data = json.dumps(tracking_impression_params)
+            conn.request('POST', '/', json_data, headers)
+            response = conn.getresponse()
+            response.read().decode()
+            # logger.error(tracking_impression_response.json())
+            # tracking_impression_response.raise_for_status()
+
+
+        query_response = {
+            'headers': {
+                'query_id': query_id
+            },
+            'ads': response_ads_aray
         }
-        tracking_impression_response = requests.post(tracking_impression_endpoint, data=tracking_impression_params)
-        logger.error(tracking_impression_response.json())
+        
+        # cache query event
+        dynamo_response = put_items(dynamo_ads_array)
+        logger.error(dynamo_response)
 
-    query_response = {
-        'headers': {
-            'query_id': query_id
-        },
-        'ads': response_ads_aray
-    }
-    
-    # cache query event
-    dynamo_response = put_items(dynamo_ads_array)
-    logger.error(dynamo_response)
+        # tracking (query event)
+        tracking_query_params = {
+            "query_id": str(query_id),
+            "timestamp": str(now_timestamp.isoformat()),
+            "publisher_id": str(publisher), 
+            "category" : str(category),
+            "zip_code": str(zip_code)
+        }
+        # tracking_query_response = requests.post(tracking_query_endpoint, data=tracking_query_params)
 
-    # tracking (query event)
-    tracking_query_params = {
-        "query_id": query_id,
-        "timestamp": now_timestamp,
-        "publisher_id": publisher, 
-        "category" : category,
-        "zip_code": str(zip_code)
-    }
-    tracking_query_response = requests.post(tracking_query_endpoint, data=tracking_query_params)
-    logger.error(tracking_query_response)
+        conn = http.client.HTTPConnection(host=tracking_query_endpoint)
+        headers = {'Content-type': 'application/json'}
+        json_data = json.dumps(tracking_query_params)
+        conn.request('POST', '/', json_data, headers)
+        response = conn.getresponse()
+        response.read().decode()
+
+        # tracking_query_response.raise_for_status()
+        # logger.error(tracking_query_response)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     return query_response
