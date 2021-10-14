@@ -5,6 +5,8 @@ from fastapi.param_functions import Query
 import json
 
 import logging
+
+# 2.22.0 es la version que deberia funcionar
 import requests
 import boto3
 import os
@@ -33,8 +35,8 @@ ranking_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.c
 ads_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ads'
 pricing_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/pricing'
 click_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/click'
-tracking_query_endpoint = 'internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
-tracking_impression_endpoint = 'internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
+tracking_query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
+tracking_impression_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
 
 if __name__ != "main":
     logger.setLevel(gunicorn_logger.level)
@@ -159,30 +161,45 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
                 cursor.execute(sql_query,(ad['campaign_id']))
                 advertiser_id = cursor.fetchone()
             
-            tracking_impression_params = {
-                "query_id": str(query_id),
-                "impression_id": str(impression_id),
-                "timestamp": str(now_timestamp.isoformat()),
-                "publisher_id": str(publisher),
-                "advertiser_id" : str(advertiser_id),
-                "advertiser_campaign_id": str(ad['campaign_id']),
-                "category": str(category),
-                "ad_id": str(ad['id']),
-                "zip_code": str(zip_code),
-                "advertiser_price": str(advertiser_price),
-                "publisher_price": str(publisher_price),
-                "position": str(index)
-            }
-            # tracking_impression_response = requests.post(tracking_impression_endpoint, data=json.dumps(tracking_impression_params))
+            # tracking_impression_params = {
+            #     "query_id": str(query_id),
+            #     "impression_id": str(impression_id),
+            #     "timestamp": str(now_timestamp.isoformat()),
+            #     "publisher_id": str(publisher),
+            #     "advertiser_id" : str(advertiser_id),
+            #     "advertiser_campaign_id": str(ad['campaign_id']),
+            #     "category": str(category),
+            #     "ad_id": str(ad['id']),
+            #     "zip_code": str(zip_code),
+            #     "advertiser_price": str(advertiser_price),
+            #     "publisher_price": str(publisher_price),
+            #     "position": str(index)
+            # }
 
-            conn = http.client.HTTPConnection(host=tracking_impression_endpoint)
-            headers = {'Content-type': 'application/json'}
-            json_data = json.dumps(tracking_impression_params)
-            conn.request('POST', '/', json_data, headers)
-            response = conn.getresponse()
-            response.read().decode()
-            # logger.error(tracking_impression_response.json())
-            # tracking_impression_response.raise_for_status()
+            tracking_impression_params = {
+                "query_id":"6",
+                "impression_id":"25",
+                "timestamp":"2021-10-12T00:34:18.946089",
+                "publisher_id":"1",
+                "advertiser_id":"4",
+                "advertiser_campaign_id":"88",
+                "category":"2",
+                "ad_id":"12",
+                "zip_code":"222333",
+                "advertiser_price":"30",
+                "publisher_price":"90",
+                "position":"16"
+            }
+            tracking_impression_response = requests.post(tracking_impression_endpoint, data=json.dumps(tracking_impression_params))
+
+            # conn = http.client.HTTPConnection(host=tracking_impression_endpoint)
+            # headers = {'Content-type': 'application/json'}
+            # json_data = json.dumps(tracking_impression_params)
+            # conn.request('POST', '/', json_data, headers)
+            # response = conn.getresponse()
+            # response.read().decode()
+            logger.error(tracking_impression_response.json())
+            tracking_impression_response.raise_for_status()
 
 
         query_response = {
@@ -197,24 +214,31 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
         logger.error(dynamo_response)
 
         # tracking (query event)
+        # tracking_query_params = {
+        #     "query_id": str(query_id),
+        #     "timestamp": str(now_timestamp.isoformat()),
+        #     "publisher_id": str(publisher),
+        #     "category" : str(category),
+        #     "zip_code": str(zip_code)
+        # }
         tracking_query_params = {
-            "query_id": str(query_id),
-            "timestamp": str(now_timestamp.isoformat()),
-            "publisher_id": str(publisher),
-            "category" : str(category),
-            "zip_code": str(zip_code)
+            "query_id":"123aadfassd",
+            "timestamp":"2021-10-12T00:34:18.946089",
+            "publisher_id":"2",
+            "category":1,
+            "zip_code":"abc123"
         }
-        # tracking_query_response = requests.post(tracking_query_endpoint, data=tracking_query_params)
+        tracking_query_response = requests.post(tracking_query_endpoint, data=tracking_query_params)
 
-        conn = http.client.HTTPConnection(host=tracking_query_endpoint)
-        headers = {'Content-type': 'application/json'}
-        json_data = json.dumps(tracking_query_params)
-        conn.request('POST', '/', json_data, headers)
-        response = conn.getresponse()
-        response.read().decode()
+        # conn = http.client.HTTPConnection(host=tracking_query_endpoint)
+        # headers = {'Content-type': 'application/json'}
+        # json_data = json.dumps(tracking_query_params)
+        # conn.request('POST', '/', json_data, headers)
+        # response = conn.getresponse()
+        # response.read().decode()
 
-        # tracking_query_response.raise_for_status()
-        # logger.error(tracking_query_response)
+        tracking_query_response.raise_for_status()
+        logger.error(tracking_query_response)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
