@@ -1,12 +1,8 @@
-from typing import Optional, List
-from fastapi import FastAPI, HTTPException
-from fastapi.logger import logger
-from fastapi.param_functions import Query
-import json
-
-import logging
-
 # 2.22.0 es la version que deberia funcionar
+from flask import Flask
+from typing import Optional, List
+import json
+import logging
 import requests
 import boto3
 import os
@@ -16,16 +12,12 @@ import pymysql
 import http.client
 
 
+app = Flask(__name__)
 
 DB_ENDPOINT = os.environ.get('db_endpoint')
 DB_ADMIN_USER = os.environ.get('db_admin_user')
 DB_ADMIN_PASSWORD = os.environ.get('db_admin_password')
 DB_NAME = os.environ.get('db_name')
-
-app = FastAPI(title='Query Service', version='0.1')
-gunicorn_logger = logging.getLogger('gunicorn.error')
-logger.handlers = gunicorn_logger.handlers
-logger.setLevel(gunicorn_logger.level)
 
 query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/query'
 matching_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/matching'
@@ -38,19 +30,12 @@ click_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/click'
 tracking_query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
 tracking_impression_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
 
-if __name__ != "main":
-    logger.setLevel(gunicorn_logger.level)
-else:
-    logger.setLevel(logging.DEBUG)
-
 
 def get_db_conn():
     try:
         conn = pymysql.connect(host=DB_ENDPOINT, user=DB_ADMIN_USER, passwd=DB_ADMIN_PASSWORD, db=DB_NAME, connect_timeout=5)
         return conn
     except pymysql.MySQLError as e:
-        logger.error("ERROR: Unexpected error: Could not connect to MySQL instance.")
-        logger.error(e)
         raise
     
     
@@ -66,7 +51,7 @@ def put_items(items):
     return table
 
 
-@app.get("/")
+@app.route('/')
 def read_root():
     table = put_items([])
     return {"Service": "Query", "table.creation_date_time": table.creation_date_time, 'tomorrow': datetime.datetime.now().timestamp() + (24*60*60)}
@@ -75,7 +60,6 @@ def read_root():
 @app.get("/query")
 def query(category: int, publisher: int, zip_code: int, maximum: int = None):
     try:
-
         now_timestamp = datetime.datetime.now()
 
         conn = get_db_conn()
@@ -84,11 +68,8 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
         matching_params = {"category": category}
         matching_response = requests.get(matching_endpoint, params=matching_params)
         matching_response.raise_for_status()
-        logger.error(matching_response)
-        logger.error(matching_response.json())
         campaign_ids = [campaign['id'] for campaign in matching_response.json()]
         advertiser_campaigns = ','.join(map(str, campaign_ids))
-        logger.error(advertiser_campaigns)
 
         # exclusion & targeting
         exclusion_params = {"advertiser_campaigns": advertiser_campaigns, 'publisher': publisher}
@@ -97,13 +78,8 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
         targeting_params = {"advertiser_campaigns": advertiser_campaigns, "zip_code": zip_code}
         targeting_response = requests.get(targeting_endpoint, targeting_params)
 
-        logger.error(exclusion_response.json())
-        logger.error(targeting_response.json())
-
         valid_campaigns = list(set(exclusion_response.json()).intersection(set(targeting_response.json())))
         valid_advertiser_campaigns = ','.join(map(str, valid_campaigns))
-        logger.error(valid_campaigns)
-        logger.error(valid_advertiser_campaigns)
 
         campaign_bids = [campaign['bid'] for campaign in matching_response.json() if (campaign['id'] in valid_campaigns)]
         campaign_bids = ','.join(map(str, campaign_bids))
@@ -114,17 +90,14 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
             ranking_params["maximum"] = maximum
 
         ranking_response = requests.get(ranking_endpoint, params=ranking_params)
-        logger.error(ranking_response.json())
 
         # ads
         ads_params = {"advertiser_campaigns": valid_advertiser_campaigns}
         ads_response = requests.get(ads_endpoint, params=ads_params)
-        logger.error(ads_response.json())
 
         # pricing
         pricing_params = {"advertiser_campaigns": valid_advertiser_campaigns, "advertiser_campaigns_bids": campaign_bids, "publisher": publisher}
         pricing_response = requests.get(pricing_endpoint, params=pricing_params)
-        logger.error(pricing_response.json())
 
         # query & tracking (impression events)
         query_id = str(uuid.uuid4())
@@ -161,21 +134,6 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
                 cursor.execute(sql_query,(ad['campaign_id']))
                 advertiser_id = cursor.fetchone()
             
-            # tracking_impression_params = {
-            #     "query_id": str(query_id),
-            #     "impression_id": str(impression_id),
-            #     "timestamp": str(now_timestamp.isoformat()),
-            #     "publisher_id": str(publisher),
-            #     "advertiser_id" : str(advertiser_id),
-            #     "advertiser_campaign_id": str(ad['campaign_id']),
-            #     "category": str(category),
-            #     "ad_id": str(ad['id']),
-            #     "zip_code": str(zip_code),
-            #     "advertiser_price": str(advertiser_price),
-            #     "publisher_price": str(publisher_price),
-            #     "position": str(index)
-            # }
-
             tracking_impression_params = {
                 "query_id":"6",
                 "impression_id":"25",
@@ -191,14 +149,6 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
                 "position":"16"
             }
             tracking_impression_response = requests.post(tracking_impression_endpoint, data=json.dumps(tracking_impression_params))
-
-            # conn = http.client.HTTPConnection(host=tracking_impression_endpoint)
-            # headers = {'Content-type': 'application/json'}
-            # json_data = json.dumps(tracking_impression_params)
-            # conn.request('POST', '/', json_data, headers)
-            # response = conn.getresponse()
-            # response.read().decode()
-            logger.error(tracking_impression_response.json())
             tracking_impression_response.raise_for_status()
 
 
@@ -211,16 +161,7 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
         
         # cache query event
         dynamo_response = put_items(dynamo_ads_array)
-        logger.error(dynamo_response)
 
-        # tracking (query event)
-        # tracking_query_params = {
-        #     "query_id": str(query_id),
-        #     "timestamp": str(now_timestamp.isoformat()),
-        #     "publisher_id": str(publisher),
-        #     "category" : str(category),
-        #     "zip_code": str(zip_code)
-        # }
         tracking_query_params = {
             "query_id":"123aadfassd",
             "timestamp":"2021-10-12T00:34:18.946089",
@@ -229,18 +170,13 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
             "zip_code":"abc123"
         }
         tracking_query_response = requests.post(tracking_query_endpoint, data=tracking_query_params)
-
-        # conn = http.client.HTTPConnection(host=tracking_query_endpoint)
-        # headers = {'Content-type': 'application/json'}
-        # json_data = json.dumps(tracking_query_params)
-        # conn.request('POST', '/', json_data, headers)
-        # response = conn.getresponse()
-        # response.read().decode()
-
         tracking_query_response.raise_for_status()
-        logger.error(tracking_query_response)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        pass 
+    
     return query_response
+
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0')
