@@ -161,43 +161,39 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
                 cursor.execute(sql_query,(ad['campaign_id']))
                 advertiser_id = cursor.fetchone()
             
-            # tracking_impression_params = {
-            #     "query_id": str(query_id),
-            #     "impression_id": str(impression_id),
-            #     "timestamp": str(now_timestamp.isoformat()),
-            #     "publisher_id": str(publisher),
-            #     "advertiser_id" : str(advertiser_id),
-            #     "advertiser_campaign_id": str(ad['campaign_id']),
-            #     "category": str(category),
-            #     "ad_id": str(ad['id']),
-            #     "zip_code": str(zip_code),
-            #     "advertiser_price": str(advertiser_price),
-            #     "publisher_price": str(publisher_price),
-            #     "position": str(index)
-            # }
-
             tracking_impression_params = {
-                "query_id":"6",
-                "impression_id":"25",
-                "timestamp":"2021-10-12T00:34:18.946089",
-                "publisher_id":"1",
-                "advertiser_id":"4",
-                "advertiser_campaign_id":"88",
-                "category":"2",
-                "ad_id":"12",
-                "zip_code":"222333",
-                "advertiser_price":"30",
-                "publisher_price":"90",
-                "position":"16"
+                "query_id": str(query_id),
+                "impression_id": str(impression_id),
+                "timestamp": str(now_timestamp),
+                "publisher_id": int(publisher),
+                "advertiser_id" : int(advertiser_id["advertiser_id"]),
+                "advertiser_campaign_id": int(ad['campaign_id']),
+                "category": int(category),
+                "ad_id": int(ad['id']),
+                "zip_code": str(zip_code),
+                "advertiser_price": float(advertiser_price),
+                "publisher_price": float(publisher_price),
+                "position": int(index)
             }
-            tracking_impression_response = requests.post(tracking_impression_endpoint, data=json.dumps(tracking_impression_params))
 
-            # conn = http.client.HTTPConnection(host=tracking_impression_endpoint)
-            # headers = {'Content-type': 'application/json'}
-            # json_data = json.dumps(tracking_impression_params)
-            # conn.request('POST', '/', json_data, headers)
-            # response = conn.getresponse()
-            # response.read().decode()
+            # tracking_impression_params = {
+            #     "query_id":"6",
+            #     "impression_id":"25",
+            #     "timestamp":"2021-10-12T00:34:18.946089",
+            #     "publisher_id":1,
+            #     "advertiser_id":4,
+            #     "advertiser_campaign_id":88,
+            #     "category":2,
+            #     "ad_id":12,
+            #     "zip_code":"222333",
+            #     "advertiser_price":30.00,
+            #     "publisher_price":90.00,
+            #     "position":16
+            # }
+            # headers = {'Content-type': 'content_type_value'}
+
+            tracking_impression_response = requests.post(tracking_impression_endpoint,json=tracking_impression_params)
+
             logger.error(tracking_impression_response.json())
             tracking_impression_response.raise_for_status()
 
@@ -214,28 +210,21 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
         logger.error(dynamo_response)
 
         # tracking (query event)
-        # tracking_query_params = {
-        #     "query_id": str(query_id),
-        #     "timestamp": str(now_timestamp.isoformat()),
-        #     "publisher_id": str(publisher),
-        #     "category" : str(category),
-        #     "zip_code": str(zip_code)
-        # }
         tracking_query_params = {
-            "query_id":"123aadfassd",
-            "timestamp":"2021-10-12T00:34:18.946089",
-            "publisher_id":"2",
-            "category":1,
-            "zip_code":"abc123"
+            "query_id": str(query_id),
+            "timestamp": str(now_timestamp),
+            "publisher_id": int(publisher),
+            "category" : int(category),
+            "zip_code": str(zip_code)
         }
-        tracking_query_response = requests.post(tracking_query_endpoint, data=tracking_query_params)
-
-        # conn = http.client.HTTPConnection(host=tracking_query_endpoint)
-        # headers = {'Content-type': 'application/json'}
-        # json_data = json.dumps(tracking_query_params)
-        # conn.request('POST', '/', json_data, headers)
-        # response = conn.getresponse()
-        # response.read().decode()
+        # tracking_query_params = {
+        #     "query_id":"123aadfassd",
+        #     "timestamp":"2021-10-12T00:34:18.946089",
+        #     "publisher_id":2,
+        #     "category":1,
+        #     "zip_code":"abc123"
+        # }
+        tracking_query_response = requests.post(tracking_query_endpoint, json=tracking_query_params)
 
         tracking_query_response.raise_for_status()
         logger.error(tracking_query_response)
