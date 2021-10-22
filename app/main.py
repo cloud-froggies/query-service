@@ -13,8 +13,7 @@ import os
 import uuid
 import datetime
 import pymysql
-import http.client
-
+from decimal import Decimal
 
 
 DB_ENDPOINT = os.environ.get('db_endpoint')
@@ -124,7 +123,7 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
         # pricing
         pricing_params = {"advertiser_campaigns": valid_advertiser_campaigns, "advertiser_campaigns_bids": campaign_bids, "publisher": publisher}
         pricing_response = requests.get(pricing_endpoint, params=pricing_params)
-        logger.error(pricing_response.json())
+        logger.error(pricing_response)
 
         # query & tracking (impression events)
         query_id = str(uuid.uuid4())
@@ -141,19 +140,9 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
                 "click_url": f'{click_endpoint}?query_id={query_id}&impression_id={impression_id}'
             })
 
-            dynamo_ads_array.append({
-                "query_id": query_id,
-                "impression_id": impression_id,
-                "advertiser_url": ad["url"],
-                # hours * minutes * seconds
-                "expdate": int(now_timestamp.timestamp() + (24*60*60))
-            })
-
             # using list comprehension
-            # publisher_price = [campaign for campaign in pricing_response if campaign['id']==ad['campaign_id']][0]['price']
-            # advertiser_price = [campaign for campaign in matching_response if campaign['id']==ad['campaign_id']][0]['bid'] - publisher_price
-            publisher_price = 0.0
-            advertiser_price = 0.0
+            publisher_price = [campaign for campaign in pricing_response.json() if campaign['id']==ad['campaign_id']][0]['price']
+            advertiser_price = [campaign for campaign in matching_response.json() if campaign['id']==ad['campaign_id']][0]['bid'] - publisher_price
 
             # using db connection
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -161,6 +150,24 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
                 cursor.execute(sql_query,(ad['campaign_id']))
                 advertiser_id = cursor.fetchone()
             
+            dynamo_ads_array.append({
+                "query_id": str(query_id),
+                "impression_id": str(impression_id),
+                "advertiser_url": ad["url"],
+                "campaign_id": int(ad["campaign_id"]),
+                "ad_id":int(ad["id"]),
+                "advertiser_price": str(advertiser_price),
+                "publisher_price": str(publisher_price),
+                "position": int(index),
+                "zip_code": str(zip_code),
+                "category": int(category),
+                "advertiser_id" : int(advertiser_id["advertiser_id"]),
+                "advertiser_campaign_id": int(ad['campaign_id']),
+                "publisher_id": int(publisher),
+                # hours * minutes * seconds
+                "expdate": int(now_timestamp.timestamp() + (24*60*60))
+            })
+
             tracking_impression_params = {
                 "query_id": str(query_id),
                 "impression_id": str(impression_id),
@@ -175,22 +182,6 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
                 "publisher_price": float(publisher_price),
                 "position": int(index)
             }
-
-            # tracking_impression_params = {
-            #     "query_id":"6",
-            #     "impression_id":"25",
-            #     "timestamp":"2021-10-12T00:34:18.946089",
-            #     "publisher_id":1,
-            #     "advertiser_id":4,
-            #     "advertiser_campaign_id":88,
-            #     "category":2,
-            #     "ad_id":12,
-            #     "zip_code":"222333",
-            #     "advertiser_price":30.00,
-            #     "publisher_price":90.00,
-            #     "position":16
-            # }
-            # headers = {'Content-type': 'content_type_value'}
 
             tracking_impression_response = requests.post(tracking_impression_endpoint,json=tracking_impression_params)
 
@@ -217,13 +208,7 @@ def query(category: int, publisher: int, zip_code: int, maximum: int = None):
             "category" : int(category),
             "zip_code": str(zip_code)
         }
-        # tracking_query_params = {
-        #     "query_id":"123aadfassd",
-        #     "timestamp":"2021-10-12T00:34:18.946089",
-        #     "publisher_id":2,
-        #     "category":1,
-        #     "zip_code":"abc123"
-        # }
+
         tracking_query_response = requests.post(tracking_query_endpoint, json=tracking_query_params)
 
         tracking_query_response.raise_for_status()
