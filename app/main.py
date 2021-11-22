@@ -26,16 +26,16 @@ gunicorn_logger = logging.getLogger('gunicorn.error')
 logger.handlers = gunicorn_logger.handlers
 logger.setLevel(gunicorn_logger.level)
 
-query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/query'
-matching_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/matching'
-exclusion_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/exclusion'
-targeting_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/targeting'
-ranking_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ranking'
-ads_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/ads'
-pricing_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/pricing'
+query_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/query'
+matching_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/matching'
+exclusion_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/exclusion'
+targeting_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/targeting'
+ranking_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/ranking'
+ads_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/ads'
+pricing_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/pricing'
 click_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/click'
-tracking_query_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/query'
-tracking_impression_endpoint = 'http://internal-private-1191134035.us-east-2.elb.amazonaws.com/tracking/impression'
+tracking_query_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/tracking/query'
+tracking_impression_endpoint = 'http://public-18635190.us-east-2.elb.amazonaws.com/tracking/impression'
 
 if __name__ != "main":
     logger.setLevel(gunicorn_logger.level)
